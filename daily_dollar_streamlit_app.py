@@ -9,16 +9,16 @@ import secrets
 import stripe
 
 # Stripe Configuration
-stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ" 
-STRIPE_PRICE_ID = "price_1R9yRkCGGJzgCEPTOnnnvEKi" 
-STRIPE_SUCCESS_URL = "https://the-daily-dollar.streamlit.app?success=true"
+stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
+STRIPE_PRICE_ID = "price_1R9yRkCGGJzgCEPTOnnnvEKi"
+STRIPE_SUCCESS_URL = "https://the-daily-dollar.streamlit.app/?success=true"
 STRIPE_CANCEL_URL = "https://the-daily-dollar.streamlit.app/?cancel=true"
 
 USERS_FILE = "users.json"
 ENTRIES_FILE = "entries.json"
 DRAWS_FILE = "draw_results.json"
 
-# -------------------- Models --------------------
+# Models and Helpers
 
 class User:
     def __init__(self, user_id, username, phone, password_hash, auto_entry=False):
@@ -40,16 +40,11 @@ class User:
     @staticmethod
     def from_dict(data):
         return User(
-            data["user_id"],
-            data["username"],
-            data["phone"],
-            data["password_hash"],
-            data.get("auto_entry", False)
+            data["user_id"], data["username"], data["phone"], data["password_hash"], data.get("auto_entry", False)
         )
 
     def verify_password(self, password):
         return bcrypt.verify(password, self.password_hash)
-
 
 class Entry:
     def __init__(self, user_id, entry_type, amount=Decimal("0.00"), timestamp=None):
@@ -75,7 +70,6 @@ class Entry:
             timestamp=datetime.fromisoformat(data["timestamp"])
         )
 
-
 class DrawResult:
     def __init__(self, date, draw_type, winner_username, prize):
         self.date = date
@@ -100,7 +94,7 @@ class DrawResult:
             prize=Decimal(data["prize"])
         )
 
-# -------------------- File I/O --------------------
+# Data Utilities
 
 def save_json(path, data):
     with open(path, "w") as f:
@@ -112,23 +106,13 @@ def load_json(path):
     with open(path, "r") as f:
         return json.load(f)
 
-def load_users():
-    return [User.from_dict(u) for u in load_json(USERS_FILE)]
+def load_users(): return [User.from_dict(u) for u in load_json(USERS_FILE)]
+def load_entries(): return [Entry.from_dict(e) for e in load_json(ENTRIES_FILE)]
+def load_draws(): return [DrawResult.from_dict(d) for d in load_json(DRAWS_FILE)]
 
-def load_entries():
-    return [Entry.from_dict(e) for e in load_json(ENTRIES_FILE)]
-
-def load_draws():
-    return [DrawResult.from_dict(d) for d in load_json(DRAWS_FILE)]
-
-def save_users(users):
-    save_json(USERS_FILE, [u.to_dict() for u in users])
-
-def save_entries(entries):
-    save_json(ENTRIES_FILE, [e.to_dict() for e in entries])
-
-def save_draws(draws):
-    save_json(DRAWS_FILE, [d.to_dict() for d in draws])
+def save_users(users): save_json(USERS_FILE, [u.to_dict() for u in users])
+def save_entries(entries): save_json(ENTRIES_FILE, [e.to_dict() for e in entries])
+def save_draws(draws): save_json(DRAWS_FILE, [d.to_dict() for d in draws])
 
 def get_user_by_phone(phone, users):
     return next((u for u in users if u.phone == phone), None)
@@ -203,10 +187,9 @@ st.title("The Daily Dollar")
 users = load_users()
 entries = load_entries()
 draws = load_draws()
-
 main_draw_result, mini_draw_result = auto_run_daily_draw(draws, entries, users)
 
-# Login / Register
+# Auth
 st.sidebar.header("Login or Register")
 auth_mode = st.sidebar.radio("Choose mode", ["Login", "Register"])
 phone = st.sidebar.text_input("Phone Number")
@@ -216,27 +199,26 @@ if auth_mode == "Register":
     username = st.sidebar.text_input("Username")
     if st.sidebar.button("Create Account"):
         if get_user_by_phone(phone, users):
-            st.sidebar.error("Phone number already registered.")
+            st.sidebar.error("Phone already exists.")
         elif not username or not phone or not password:
-            st.sidebar.error("All fields are required.")
+            st.sidebar.error("All fields required.")
         else:
-            hashed_pw = bcrypt.hash(password)
-            new_user = User(str(uuid.uuid4())[:8], username, phone, hashed_pw)
+            new_user = User(str(uuid.uuid4())[:8], username, phone, bcrypt.hash(password))
             users.append(new_user)
             save_users(users)
             st.session_state.user = new_user.to_dict()
-            st.sidebar.success("Account created. You're logged in!")
+            st.sidebar.success("Registered and logged in!")
 
 elif auth_mode == "Login":
     if st.sidebar.button("Log In"):
         user = get_user_by_phone(phone, users)
         if not user or not user.verify_password(password):
-            st.sidebar.error("Invalid credentials.")
+            st.sidebar.error("Invalid login.")
         else:
             st.session_state.user = user.to_dict()
-            st.sidebar.success("Logged in successfully!")
+            st.sidebar.success("Logged in!")
 
-# If logged in
+# Logged-in interface
 if "user" in st.session_state and st.session_state.user:
     current_user = User.from_dict(st.session_state.user)
     st.subheader(f"Welcome, {current_user.username}!")
@@ -249,22 +231,20 @@ if "user" in st.session_state and st.session_state.user:
         st.success(msg)
         save_entries(entries)
     elif "cancel" in query_params:
-        st.warning("Payment was canceled.")
+        st.warning("Payment canceled.")
 
-if st.button("Pay $1 to Enter Main Draw"):
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            mode="payment",
-            line_items=[{
-                "price": STRIPE_PRICE_ID,
-                "quantity": 1,
-            }],
-            success_url=STRIPE_SUCCESS_URL,
-            cancel_url=STRIPE_CANCEL_URL,
+    if st.button("Pay $1 to Enter Main Draw"):
+        try:
+            session = stripe.checkout.Session.create(
+                payment_method_types=["card"],
+                mode="payment",
+                line_items=[{
+                    "price": STRIPE_PRICE_ID,
+                    "quantity": 1,
+                }],
+                success_url=STRIPE_SUCCESS_URL,
+                cancel_url=STRIPE_CANCEL_URL,
             )
-            checkout_url = session.url
-            if checkout_url:
-                st.markdown(f"[Click here to complete payment]({checkout_url})", unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"Stripe Checkout error: {str(e)}")
+            st.markdown(f"[Click here to complete payment]({session.url})", unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Stripe Checkout error: {e}")
