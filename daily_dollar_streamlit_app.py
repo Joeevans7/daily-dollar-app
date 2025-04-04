@@ -12,6 +12,54 @@ import pytz
 DB_PATH = "daily_dollar.db"
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
 
+# Initialize the database if it doesn't exist
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            phone TEXT,
+            password_hash TEXT NOT NULL,
+            sms_opt_in BOOLEAN DEFAULT 0,
+            auto_entry BOOLEAN DEFAULT 0,
+            streak INTEGER DEFAULT 0,
+            last_entry_date TEXT
+        )
+    ''')
+
+    # Entries table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            entry_type TEXT CHECK(entry_type IN ('main', 'free')),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    ''')
+
+    # Winners table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS winners (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            entry_type TEXT CHECK(entry_type IN ('main', 'free')),
+            prize_amount REAL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+# Run this once when the app starts
+init_db()
+
 # ========== Helper Functions ==========
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
