@@ -10,7 +10,7 @@ import stripe
 
 # Stripe Configuration
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ" 
-STRIPE_PRICE_ID = "prod_S46fPdAEtIqZwD" 
+STRIPE_PRICE_ID = "price_1R9yRkCGGJzgCEPTOnnnvEKi" 
 STRIPE_SUCCESS_URL = "https://the-daily-dollar.streamlit.app?success=true"
 STRIPE_CANCEL_URL = "https://the-daily-dollar.streamlit.app/?cancel=true"
 
