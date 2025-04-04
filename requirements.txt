@@ -1,3 +1,4 @@
 streamlit
 stripe
 python-dotenv
+streamlit-extras
