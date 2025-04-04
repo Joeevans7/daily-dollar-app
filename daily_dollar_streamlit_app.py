@@ -258,7 +258,7 @@ if "user" in st.session_state and st.session_state.user:
 
     # Entry buttons
     if st.button("Daily Dollar Entry"):
-    checkout_url = create_checkout_session(
+        checkout_url = create_checkout_session(
         success_url=STRIPE_SUCCESS_URL,
         cancel_url=STRIPE_CANCEL_URL,
         price_id=STRIPE_PRICE_ID
