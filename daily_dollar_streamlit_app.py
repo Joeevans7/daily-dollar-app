@@ -1,250 +1,246 @@
+
+# app.py - Streamlit Frontend
+
 import streamlit as st
-import json
-import uuid
-from decimal import Decimal
-from datetime import datetime, date, time
-from pathlib import Path
-from passlib.hash import bcrypt
-import secrets
+import sqlite3
+import hashlib
 import stripe
+from datetime import datetime, timedelta
+import pytz
 
-# Stripe Configuration
+# ========== Configuration ==========
+DB_PATH = "daily_dollar.db"
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
-STRIPE_PRICE_ID = "price_1R9yRkCGGJzgCEPTOnnnvEKi"
-STRIPE_SUCCESS_URL = "https://the-daily-dollar.streamlit.app/?success=true"
-STRIPE_CANCEL_URL = "https://the-daily-dollar.streamlit.app/?cancel=true"
 
-USERS_FILE = "users.json"
-ENTRIES_FILE = "entries.json"
-DRAWS_FILE = "draw_results.json"
+# ========== Helper Functions ==========
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-# Models and Helpers
+def create_user(username, phone, password):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO users (username, phone, password_hash)
+            VALUES (?, ?, ?)
+        ''', (username, phone, hash_password(password)))
+        conn.commit()
+        return True, "Account created!"
+    except sqlite3.IntegrityError:
+        return False, "Username already exists."
+    finally:
+        conn.close()
 
-class User:
-    def __init__(self, user_id, username, phone, password_hash, auto_entry=False):
-        self.user_id = user_id
-        self.username = username
-        self.phone = phone
-        self.password_hash = password_hash
-        self.auto_entry = auto_entry
+def login_user(username, password):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM users WHERE username = ? AND password_hash = ?
+    ''', (username, hash_password(password)))
+    user = cursor.fetchone()
+    conn.close()
+    return user
 
-    def to_dict(self):
-        return {
-            "user_id": self.user_id,
-            "username": self.username,
-            "phone": self.phone,
-            "password_hash": self.password_hash,
-            "auto_entry": self.auto_entry
-        }
-
-    @staticmethod
-    def from_dict(data):
-        return User(
-            data["user_id"], data["username"], data["phone"], data["password_hash"], data.get("auto_entry", False)
-        )
-
-    def verify_password(self, password):
-        return bcrypt.verify(password, self.password_hash)
-
-class Entry:
-    def __init__(self, user_id, entry_type, amount=Decimal("0.00"), timestamp=None):
-        self.user_id = user_id
-        self.entry_type = entry_type
-        self.amount = amount
-        self.timestamp = timestamp or datetime.now()
-
-    def to_dict(self):
-        return {
-            "user_id": self.user_id,
-            "entry_type": self.entry_type,
-            "amount": str(self.amount),
-            "timestamp": self.timestamp.isoformat()
-        }
-
-    @staticmethod
-    def from_dict(data):
-        return Entry(
-            user_id=data["user_id"],
-            entry_type=data["entry_type"],
-            amount=Decimal(data["amount"]),
-            timestamp=datetime.fromisoformat(data["timestamp"])
-        )
-
-class DrawResult:
-    def __init__(self, date, draw_type, winner_username, prize):
-        self.date = date
-        self.draw_type = draw_type
-        self.winner_username = winner_username
-        self.prize = prize
-
-    def to_dict(self):
-        return {
-            "date": self.date.isoformat(),
-            "draw_type": self.draw_type,
-            "winner_username": self.winner_username,
-            "prize": str(self.prize)
-        }
-
-    @staticmethod
-    def from_dict(data):
-        return DrawResult(
-            date=datetime.fromisoformat(data["date"]),
-            draw_type=data["draw_type"],
-            winner_username=data["winner_username"],
-            prize=Decimal(data["prize"])
-        )
-
-# Data Utilities
-
-def save_json(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-
-def load_json(path):
-    if not Path(path).exists():
-        return []
-    with open(path, "r") as f:
-        return json.load(f)
-
-def load_users(): return [User.from_dict(u) for u in load_json(USERS_FILE)]
-def load_entries(): return [Entry.from_dict(e) for e in load_json(ENTRIES_FILE)]
-def load_draws(): return [DrawResult.from_dict(d) for d in load_json(DRAWS_FILE)]
-
-def save_users(users): save_json(USERS_FILE, [u.to_dict() for u in users])
-def save_entries(entries): save_json(ENTRIES_FILE, [e.to_dict() for e in entries])
-def save_draws(draws): save_json(DRAWS_FILE, [d.to_dict() for d in draws])
-
-def get_user_by_phone(phone, users):
-    return next((u for u in users if u.phone == phone), None)
-
-def has_already_entered(user, entry_type, entries):
-    today = date.today()
-    return any(
-        e.user_id == user.user_id and
-        e.entry_type == entry_type and
-        e.timestamp.date() == today
-        for e in entries
-    )
-
-def is_entry_window_open():
-    now = datetime.now().time()
-    return now >= time(17, 0) or now <= time(15, 0)
-
-def enter_draw(user, entry_type, entries):
-    if not is_entry_window_open():
-        return False, "Entry window closed. You’ll have to wait for the next drawing."
-    if has_already_entered(user, entry_type, entries):
-        return False, f"You've already entered the {entry_type} draw today!"
-    amount = Decimal("1.00") if entry_type == "main" else Decimal("0.00")
-    entries.append(Entry(user.user_id, entry_type, amount))
-    return True, f"Successfully entered the {entry_type} draw!"
-
-def calculate_dashboard(entries):
-    today = date.today()
-    main_entries = [e for e in entries if e.entry_type == "main" and e.timestamp.date() == today]
-    mini_entries = [e for e in entries if e.entry_type == "mini" and e.timestamp.date() == today]
-    pot = sum(e.amount for e in main_entries)
-    fee = (pot * Decimal("0.10")).quantize(Decimal("0.01"))
-    mini_prize = (pot * Decimal("0.02")).quantize(Decimal("0.01"))
-    return len(main_entries), len(mini_entries), pot, fee, mini_prize
-
-def select_winner(entries):
-    return secrets.choice(entries) if entries else None
-
-def run_draw(draw_type, entries, users):
-    today = date.today()
-    filtered = [e for e in entries if e.entry_type == draw_type and e.timestamp.date() == today]
-    if not filtered:
-        return None
-    winner_entry = select_winner(filtered)
-    user = next((u for u in users if u.user_id == winner_entry.user_id), None)
-    if draw_type == "main":
-        pot = sum(e.amount for e in filtered)
-        prize = (pot * Decimal("0.90")).quantize(Decimal("0.01"))
+def is_within_entry_window():
+    cst = pytz.timezone('US/Central')
+    now_cst = datetime.now(pytz.utc).astimezone(cst)
+    entry_start = now_cst.replace(hour=18, minute=1, second=0, microsecond=0)
+    entry_end = now_cst.replace(hour=16, minute=59, second=0, microsecond=0)
+    if now_cst.hour < 17:
+        entry_start -= timedelta(days=1)
     else:
-        pot = sum(e.amount for e in entries if e.entry_type == "main" and e.timestamp.date() == today)
-        prize = (pot * Decimal("0.02")).quantize(Decimal("0.01"))
-    return DrawResult(date=today, draw_type=draw_type, winner_username=user.username, prize=prize)
+        entry_end += timedelta(days=1)
+    return entry_start <= now_cst <= entry_end
 
-def auto_run_daily_draw(draws, entries, users):
-    now = datetime.now()
-    today = date.today()
-    already_drawn = any(d.date.date() == today for d in draws)
-    if now.hour >= 16 and not already_drawn:
-        main = run_draw("main", entries, users)
-        mini = run_draw("mini", entries, users)
-        if main: draws.append(main)
-        if mini: draws.append(mini)
-        save_draws(draws)
-        return main, mini
-    return None, None
+def enter_daily_dollar(user_id, entry_type):
+    if entry_type not in ['main', 'free']:
+        return "Invalid entry type."
+    if not is_within_entry_window():
+        return "Entry window is currently closed."
+    today = datetime.now(pytz.utc).astimezone(pytz.timezone('US/Central')).date().isoformat()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM entries WHERE user_id = ? AND date = ? AND entry_type = ?', (user_id, today, entry_type))
+    if cursor.fetchone():
+        conn.close()
+        return "You have already entered for today."
+    cursor.execute('INSERT INTO entries (user_id, date, entry_type) VALUES (?, ?, ?)', (user_id, today, entry_type))
+    if entry_type == 'main':
+        cursor.execute('SELECT last_entry_date, streak FROM users WHERE id = ?', (user_id,))
+        last_entry_date, streak = cursor.fetchone()
+        yesterday = (datetime.now(pytz.utc).astimezone(pytz.timezone('US/Central')).date() - timedelta(days=1)).isoformat()
+        if last_entry_date == yesterday:
+            streak += 1
+        else:
+            streak = 1
+        cursor.execute('UPDATE users SET last_entry_date = ?, streak = ? WHERE id = ?', (today, streak, user_id))
+    conn.commit()
+    conn.close()
+    return f"{entry_type.capitalize()} entry successful."
 
-# -------------------- Streamlit App --------------------
+def create_checkout_session(price_id, username, mode="payment"):
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=[{"price": price_id, "quantity": 1}],
+        mode=mode,
+        client_reference_id=username,
+        success_url=f"http://localhost:8501?success=true&user={username}",
+        cancel_url="http://localhost:8501?canceled=true"
+    )
+    return session.url
 
-st.set_page_config(page_title="The Daily Dollar", layout="centered")
+def get_username_by_id(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else "Unknown"
+
+def get_yesterdays_winners():
+    cst = pytz.timezone('US/Central')
+    yesterday = (datetime.now(pytz.utc).astimezone(cst).date() - timedelta(days=1)).isoformat()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, entry_type, prize_amount FROM winners WHERE date = ?", (yesterday,))
+    winners = cursor.fetchall()
+    conn.close()
+    return winners
+
+def get_top_streaks():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, streak FROM users ORDER BY streak DESC LIMIT 10")
+    top_users = cursor.fetchall()
+    conn.close()
+    return top_users
+
+def update_phone(user_id, new_phone):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET phone = ? WHERE id = ?", (new_phone, user_id))
+    conn.commit()
+    conn.close()
+
+def toggle_option(user_id, column, value):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(f"UPDATE users SET {column} = ? WHERE id = ?", (value, user_id))
+    conn.commit()
+    conn.close()
+
+# ========== Streamlit UI ==========
+st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:")
 st.title("The Daily Dollar")
 
-users = load_users()
-entries = load_entries()
-draws = load_draws()
-main_draw_result, mini_draw_result = auto_run_daily_draw(draws, entries, users)
+menu = ["Login", "Register"]
+choice = st.sidebar.selectbox("Menu", menu)
 
-# Auth
-st.sidebar.header("Login or Register")
-auth_mode = st.sidebar.radio("Choose mode", ["Login", "Register"])
-phone = st.sidebar.text_input("Phone Number")
-password = st.sidebar.text_input("Password", type="password")
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-if auth_mode == "Register":
-    username = st.sidebar.text_input("Username")
-    if st.sidebar.button("Create Account"):
-        if get_user_by_phone(phone, users):
-            st.sidebar.error("Phone already exists.")
-        elif not username or not phone or not password:
-            st.sidebar.error("All fields required.")
+if choice == "Register":
+    st.subheader("Create Account")
+    username = st.text_input("Username")
+    phone = st.text_input("Phone Number (dashes optional)")
+    password = st.text_input("Password", type="password")
+    confirm = st.text_input("Confirm Password", type="password")
+
+    if st.button("Register"):
+        if len(password) < 7:
+            st.warning("Password must be at least 7 characters.")
+        elif password != confirm:
+            st.warning("Passwords do not match.")
         else:
-            new_user = User(str(uuid.uuid4())[:8], username, phone, bcrypt.hash(password))
-            users.append(new_user)
-            save_users(users)
-            st.session_state.user = new_user.to_dict()
-            st.sidebar.success("Registered and logged in!")
+            success, message = create_user(username, phone, password)
+            if success:
+                st.success(message)
+                st.info("Go to the Login page.")
+            else:
+                st.error(message)
 
-elif auth_mode == "Login":
-    if st.sidebar.button("Log In"):
-        user = get_user_by_phone(phone, users)
-        if not user or not user.verify_password(password):
-            st.sidebar.error("Invalid login.")
+elif choice == "Login":
+    st.subheader("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    remember = st.checkbox("Remember me")
+
+    if st.button("Login"):
+        user = login_user(username, password)
+        if user:
+            st.session_state.user = user
+            st.success(f"Welcome back, {user[1]}!")
+            st.experimental_rerun()
         else:
-            st.session_state.user = user.to_dict()
-            st.sidebar.success("Logged in!")
+            st.error("Invalid username or password.")
 
-# Logged-in interface
-if "user" in st.session_state and st.session_state.user:
-    current_user = User.from_dict(st.session_state.user)
-    st.subheader(f"Welcome, {current_user.username}!")
+# ========== Dashboard ==========
+if st.session_state.user:
+    st.sidebar.success(f"Logged in as: {st.session_state.user[1]}")
+    st.sidebar.markdown("---")
+    profile_section = st.sidebar.radio("Navigation", ["Dashboard", "Profile"])
+    user_id = st.session_state.user[0]
 
-    query_params = st.experimental_get_query_params()
-    if "success" in query_params:
-        success, msg = enter_draw(current_user, "main", entries)
-        if success:
-            st.balloons()
-        st.success(msg)
-        save_entries(entries)
-    elif "cancel" in query_params:
-        st.warning("Payment canceled.")
+    if profile_section == "Dashboard":
+        st.header("Dashboard")
 
-if st.button("Pay $1 to Enter Main Draw"):
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            mode="payment",
-            line_items=[{
-                "price": STRIPE_PRICE_ID,
-                "quantity": 1,
-            }],
-            success_url=STRIPE_SUCCESS_URL,
-            cancel_url=STRIPE_CANCEL_URL,
-        )
-        st.markdown(f"[Click here to complete payment]({session.url})", unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"Stripe Checkout error: {e}")
+        # Entry Buttons
+        st.subheader("Enter Today's Drawing")
+        entry_choice = st.radio("Choose Entry Type", ["Main ($1 via Stripe)", "Free Entry"])
+        if entry_choice.startswith("Main"):
+            if st.button("Pay & Enter via Stripe"):
+                url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
+                st.markdown(f"[Click here to pay and enter]({url})", unsafe_allow_html=True)
+        else:
+            if st.button("Enter Free Drawing"):
+                result = enter_daily_dollar(user_id, "free")
+                st.success(result) if "successful" in result else st.warning(result)
+
+        # Winners
+        st.subheader("Yesterday's Winners")
+        winners = get_yesterdays_winners()
+        if winners:
+            for user_id, entry_type, prize in winners:
+                st.write(f"**{entry_type.capitalize()} Winner**: {get_username_by_id(user_id)} â ${prize}")
+        else:
+            st.write("No winners recorded yet.")
+
+        # Leaderboard
+        st.subheader("Top 10 Entry Streaks")
+        top_users = get_top_streaks()
+        for rank, (username, streak) in enumerate(top_users, start=1):
+            st.write(f"{rank}. {username} â {streak} day streak")
+
+    elif profile_section == "Profile":
+        st.header("Your Profile")
+        username = st.session_state.user[1]
+        phone = st.session_state.user[2]
+        sms_opt_in = bool(st.session_state.user[4])
+        auto_entry = bool(st.session_state.user[5])
+
+        st.write(f"**Username:** {username}")
+        new_phone = st.text_input("Phone Number", value=phone)
+        if st.button("Update Phone"):
+            update_phone(user_id, new_phone)
+            st.success("Phone number updated!")
+
+        sms_toggle = st.checkbox("Receive SMS notifications", value=sms_opt_in)
+        auto_toggle = st.checkbox("Enable auto-entry", value=auto_entry)
+
+        if sms_toggle != sms_opt_in:
+            toggle_option(user_id, "sms_opt_in", int(sms_toggle))
+            st.success("SMS preference updated!")
+
+        if auto_toggle != auto_entry:
+            toggle_option(user_id, "auto_entry", int(auto_toggle))
+            st.success("Auto-entry preference updated!")
+
+        st.markdown("---")
+        st.markdown("**Want to automate your $1 entries?**")
+        if st.button("Subscribe to Daily Auto-Entry"):
+            url = create_checkout_session("price_1RAEQmCGGJzgCEPTrhWZ904P", username, mode="subscription")
+            st.markdown(f"[Click here to subscribe]({url})", unsafe_allow_html=True)
+
+        if st.button("Sign Out"):
+            st.session_state.user = None
+            st.experimental_rerun()
