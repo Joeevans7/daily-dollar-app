@@ -262,9 +262,9 @@ if st.button("Pay $1 to Enter Main Draw"):
             }],
             success_url=STRIPE_SUCCESS_URL,
             cancel_url=STRIPE_CANCEL_URL,
-        )
-        checkout_url = session.url
-        if checkout_url:
-            st.markdown(f"[Click here to complete payment]({checkout_url})", unsafe_allow_html=True)
+            )
+            checkout_url = session.url
+            if checkout_url:
+                st.markdown(f"[Click here to complete payment]({checkout_url})", unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Stripe Checkout error: {str(e)}")
