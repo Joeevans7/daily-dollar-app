@@ -6,10 +6,16 @@ from datetime import datetime, date, time
 from pathlib import Path
 from passlib.hash import bcrypt
 import secrets
+from stripe_checkout import create_checkout_session
 
 USERS_FILE = "users.json"
 ENTRIES_FILE = "entries.json"
 DRAWS_FILE = "draw_results.json"
+
+# Stripe config
+STRIPE_PRICE_ID = "prod_S46fPdAEtIqZwD"
+STRIPE_SUCCESS_URL = "https://your-app-name.streamlit.app/?success=true"
+STRIPE_CANCEL_URL = "https://your-app-name.streamlit.app/?cancel=true"
 
 class User:
     def __init__(self, user_id, username, phone, password_hash, auto_entry=False):
@@ -227,23 +233,41 @@ if "user" in st.session_state and st.session_state.user:
     current_user = User.from_dict(st.session_state.user)
     st.subheader(f"Welcome, {current_user.username}!")
 
+    # Handle Stripe success return
+    query_params = st.experimental_get_query_params()
+    if "success" in query_params:
+        success, msg = enter_draw(current_user, "main", entries)
+        if success:
+            st.balloons()
+        st.success(msg)
+        save_entries(entries)
+    elif "cancel" in query_params:
+        st.warning("Payment was canceled.")
+
     # Auto-entry option
     current_user.auto_entry = st.checkbox("Auto-enter me into future draws", value=current_user.auto_entry)
     save_users(users)
 
     # Dashboard
     main_count, mini_count, pot, fee, mini_prize = calculate_dashboard(entries)
-    st.metric("Main Draw Entries", main_count)
-    st.metric("Mini Draw Entries", mini_count)
+    st.metric("Daily Dollar Entries", main_count)
+    st.metric("Free Entries", mini_count)
     st.metric("Total Pot", f"${pot}")
     st.metric("Platform Fee", f"${fee}")
     st.metric("Mini Draw Prize", f"${mini_prize}")
 
     # Entry buttons
-    if st.button("Enter Main Draw ($1)"):
-        success, msg = enter_draw(current_user, "main", entries)
-        st.success(msg) if success else st.warning(msg)
-        save_entries(entries)
+    if st.button("Daily Dollar Entry):
+    checkout_url = create_checkout_session(
+        success_url=STRIPE_SUCCESS_URL,
+        cancel_url=STRIPE_CANCEL_URL,
+        price_id=STRIPE_PRICE_ID
+    )
+    if checkout_url.startswith("http"):
+        st.write("Redirecting to Stripe...")
+        st.markdown(f"[Click here to complete payment]({checkout_url})", unsafe_allow_html=True)
+    else:
+        st.error("There was a problem creating your payment session.")
     if st.button("Enter Mini Draw (Free)"):
         success, msg = enter_draw(current_user, "mini", entries)
         st.success(msg) if success else st.warning(msg)
