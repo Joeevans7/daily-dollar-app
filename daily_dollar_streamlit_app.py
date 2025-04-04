@@ -276,17 +276,19 @@ if "user" in st.session_state and st.session_state.user:
     st.metric("Platform Fee", f"${fee}")
     st.metric("Mini Draw Prize", f"${mini_prize}")
 
-    # Entry buttons
+# Stripe Main Draw Button
 if st.button("Pay $1 to Enter Main Draw"):
     checkout_url = create_checkout_session(
         success_url=STRIPE_SUCCESS_URL,
         cancel_url=STRIPE_CANCEL_URL,
         price_id=STRIPE_PRICE_ID
     )
+
     if isinstance(checkout_url, str) and checkout_url.startswith("http"):
+        st.success("Redirecting to Stripe...")
         st.markdown(f"[Click here to complete payment]({checkout_url})", unsafe_allow_html=True)
     else:
-        st.error("There was a problem creating your payment session.")
+        st.error("There was a problem starting your payment session.")
     if st.button("Enter Mini Draw (Free)"):
         success, msg = enter_draw(current_user, "mini", entries)
         st.success(msg) if success else st.warning(msg)
