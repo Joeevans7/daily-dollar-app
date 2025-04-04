@@ -174,6 +174,13 @@ def toggle_option(user_id, column, value):
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
 st.title("The Daily Dollar")
 
+# Display success or cancel message from Stripe redirect
+query_params = st.query_params
+if query_params.get("success") == "true":
+    st.success("Payment received! You’ve been entered into today’s drawing.")
+elif query_params.get("canceled") == "true":
+    st.warning("Payment canceled. You were not entered.")
+
 if "user" not in st.session_state:
     st.session_state.user = None
 
