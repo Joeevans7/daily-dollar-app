@@ -251,19 +251,20 @@ if "user" in st.session_state and st.session_state.user:
     elif "cancel" in query_params:
         st.warning("Payment was canceled.")
 
-    if st.button("Pay $1 to Enter Main Draw"):
-        try:
-            session = stripe.checkout.Session.create(
-                payment_method_types=["card"],
-                mode="payment",
-                line_items=[{
-                    "price": STRIPE_PRICE_ID,
-                    "quantity": 1,
-                }],
-                success_url=STRIPE_SUCCESS_URL,
-                cancel_url=STRIPE_CANCEL_URL,
-            )
-            checkout_url = session.url
+if st.button("Pay $1 to Enter Main Draw"):
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            line_items=[{
+                "price": STRIPE_PRICE_ID,
+                "quantity": 1,
+            }],
+            success_url=STRIPE_SUCCESS_URL,
+            cancel_url=STRIPE_CANCEL_URL,
+        )
+        checkout_url = session.url
+        if checkout_url:
             st.markdown(f"[Click here to complete payment]({checkout_url})", unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"Stripe checkout error: {str(e)}")
+    except Exception as e:
+        st.error(f"Stripe Checkout error: {str(e)}")
