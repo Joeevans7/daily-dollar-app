@@ -6,7 +6,27 @@ from datetime import datetime, date, time
 from pathlib import Path
 from passlib.hash import bcrypt
 import secrets
-from stripe_checkout import create_checkout_session
+
+# --- Stripe Checkout helper ---
+import stripe
+
+stripe.api_key = "sk_test_your_secret_key_here"  # Replace with your real key
+
+def create_checkout_session(success_url, cancel_url, price_id):
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            line_items=[{
+                "price": price_id,
+                "quantity": 1,
+            }],
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+        return session.url
+    except Exception as e:
+        return str(e)
 
 USERS_FILE = "users.json"
 ENTRIES_FILE = "entries.json"
