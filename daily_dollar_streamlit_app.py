@@ -218,7 +218,7 @@ elif choice == "Login":
         if user:
             st.session_state.user = user
             st.success(f"Welcome back, {user[1]}!")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("Invalid username or password.")
 
@@ -291,4 +291,4 @@ if st.session_state.user:
 
         if st.button("Sign Out"):
             st.session_state.user = None
-            st.experimental_rerun()
+            st.rerun()
