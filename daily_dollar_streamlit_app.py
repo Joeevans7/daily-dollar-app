@@ -10,7 +10,7 @@ import secrets
 # --- Stripe Checkout helper ---
 import stripe
 
-stripe.api_key = "sk_test_your_secret_key_here"  # Replace with your real key
+stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
 
 def create_checkout_session(success_url, cancel_url, price_id):
     try:
