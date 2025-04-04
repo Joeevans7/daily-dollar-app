@@ -257,7 +257,7 @@ if "user" in st.session_state and st.session_state.user:
     st.metric("Mini Draw Prize", f"${mini_prize}")
 
     # Entry buttons
-    if st.button("Daily Dollar Entry):
+    if st.button("Daily Dollar Entry"):
     checkout_url = create_checkout_session(
         success_url=STRIPE_SUCCESS_URL,
         cancel_url=STRIPE_CANCEL_URL,
