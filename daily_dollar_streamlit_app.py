@@ -6,36 +6,19 @@ from datetime import datetime, date, time
 from pathlib import Path
 from passlib.hash import bcrypt
 import secrets
-
-# --- Stripe Checkout helper ---
 import stripe
 
-stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
-
-def create_checkout_session(success_url, cancel_url, price_id):
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            mode="payment",
-            line_items=[{
-                "price": price_id,
-                "quantity": 1,
-            }],
-            success_url=success_url,
-            cancel_url=cancel_url,
-        )
-        return session.url
-    except Exception as e:
-        return str(e)
+# Stripe Configuration
+stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ" 
+STRIPE_PRICE_ID = "prod_S46fPdAEtIqZwD" 
+STRIPE_SUCCESS_URL = "https://the-daily-dollar.streamlit.app?success=true"
+STRIPE_CANCEL_URL = "https://the-daily-dollar.streamlit.app/?cancel=true"
 
 USERS_FILE = "users.json"
 ENTRIES_FILE = "entries.json"
 DRAWS_FILE = "draw_results.json"
 
-# Stripe config
-STRIPE_PRICE_ID = "prod_S46fPdAEtIqZwD"
-STRIPE_SUCCESS_URL = "https://your-app-name.streamlit.app/?success=true"
-STRIPE_CANCEL_URL = "https://your-app-name.streamlit.app/?cancel=true"
+# -------------------- Models --------------------
 
 class User:
     def __init__(self, user_id, username, phone, password_hash, auto_entry=False):
@@ -56,10 +39,17 @@ class User:
 
     @staticmethod
     def from_dict(data):
-        return User(data["user_id"], data["username"], data["phone"], data["password_hash"], data.get("auto_entry", False))
+        return User(
+            data["user_id"],
+            data["username"],
+            data["phone"],
+            data["password_hash"],
+            data.get("auto_entry", False)
+        )
 
     def verify_password(self, password):
         return bcrypt.verify(password, self.password_hash)
+
 
 class Entry:
     def __init__(self, user_id, entry_type, amount=Decimal("0.00"), timestamp=None):
@@ -85,6 +75,7 @@ class Entry:
             timestamp=datetime.fromisoformat(data["timestamp"])
         )
 
+
 class DrawResult:
     def __init__(self, date, draw_type, winner_username, prize):
         self.date = date
@@ -109,16 +100,16 @@ class DrawResult:
             prize=Decimal(data["prize"])
         )
 
-# ---------- Data Helpers ----------
+# -------------------- File I/O --------------------
 
-def save_json(filepath, data):
-    with open(filepath, "w") as f:
+def save_json(path, data):
+    with open(path, "w") as f:
         json.dump(data, f, indent=2)
 
-def load_json(filepath):
-    if not Path(filepath).exists():
+def load_json(path):
+    if not Path(path).exists():
         return []
-    with open(filepath, "r") as f:
+    with open(path, "r") as f:
         return json.load(f)
 
 def load_users():
@@ -154,8 +145,6 @@ def has_already_entered(user, entry_type, entries):
 def is_entry_window_open():
     now = datetime.now().time()
     return now >= time(17, 0) or now <= time(15, 0)
-
-# ---------- Entry + Draw Logic ----------
 
 def enter_draw(user, entry_type, entries):
     if not is_entry_window_open():
@@ -206,7 +195,7 @@ def auto_run_daily_draw(draws, entries, users):
         return main, mini
     return None, None
 
-# ---------- Streamlit UI ----------
+# -------------------- Streamlit App --------------------
 
 st.set_page_config(page_title="The Daily Dollar", layout="centered")
 st.title("The Daily Dollar")
@@ -215,9 +204,9 @@ users = load_users()
 entries = load_entries()
 draws = load_draws()
 
-# Auto run daily draw
 main_draw_result, mini_draw_result = auto_run_daily_draw(draws, entries, users)
 
+# Login / Register
 st.sidebar.header("Login or Register")
 auth_mode = st.sidebar.radio("Choose mode", ["Login", "Register"])
 phone = st.sidebar.text_input("Phone Number")
@@ -247,13 +236,11 @@ elif auth_mode == "Login":
             st.session_state.user = user.to_dict()
             st.sidebar.success("Logged in successfully!")
 
-# ---------- Logged-in UI ----------
-
+# If logged in
 if "user" in st.session_state and st.session_state.user:
     current_user = User.from_dict(st.session_state.user)
     st.subheader(f"Welcome, {current_user.username}!")
 
-    # Handle Stripe success return
     query_params = st.experimental_get_query_params()
     if "success" in query_params:
         success, msg = enter_draw(current_user, "main", entries)
@@ -264,52 +251,19 @@ if "user" in st.session_state and st.session_state.user:
     elif "cancel" in query_params:
         st.warning("Payment was canceled.")
 
-    # Auto-entry option
-    current_user.auto_entry = st.checkbox("Auto-enter me into future draws", value=current_user.auto_entry)
-    save_users(users)
-
-    # Dashboard
-    main_count, mini_count, pot, fee, mini_prize = calculate_dashboard(entries)
-    st.metric("Daily Dollar Entries", main_count)
-    st.metric("Free Entries", mini_count)
-    st.metric("Total Pot", f"${pot}")
-    st.metric("Platform Fee", f"${fee}")
-    st.metric("Mini Draw Prize", f"${mini_prize}")
-
-# Stripe Main Draw Button
-if st.button("Pay $1 to Enter Main Draw"):
-    checkout_url = create_checkout_session(
-        success_url=STRIPE_SUCCESS_URL,
-        cancel_url=STRIPE_CANCEL_URL,
-        price_id=STRIPE_PRICE_ID
-    )
-
-    if isinstance(checkout_url, str) and checkout_url.startswith("http"):
-        st.success("Redirecting to Stripe...")
-        st.markdown(f"[Click here to complete payment]({checkout_url})", unsafe_allow_html=True)
-    else:
-        st.error("There was a problem starting your payment session.")
-    if st.button("Enter Mini Draw (Free)"):
-        success, msg = enter_draw(current_user, "mini", entries)
-        st.success(msg) if success else st.warning(msg)
-        save_entries(entries)
-
-    # Profile
-    st.markdown("### Your Entry Profile")
-    total_days = len({e.timestamp.date() for e in entries if e.user_id == current_user.user_id})
-    st.write(f"You’ve entered on **{total_days} unique days**.")
-    if main_draw_result and main_draw_result.winner_username == current_user.username:
-        st.balloons()
-        st.success("You won the MAIN draw today!")
-    if mini_draw_result and mini_draw_result.winner_username == current_user.username:
-        st.balloons()
-        st.success("You won the MINI draw today!")
-
-    # Yesterday leaderboard
-    st.markdown("### Yesterday’s Winners")
-    yesterday = date.today().toordinal() - 1
-    for d in draws:
-        if d.date.date().toordinal() == yesterday:
-            st.info(f"{d.draw_type.upper()} - {d.winner_username} won ${d.prize}")
-else:
-    st.warning("Please log in or register to play.")
+    if st.button("Pay $1 to Enter Main Draw"):
+        try:
+            session = stripe.checkout.Session.create(
+                payment_method_types=["card"],
+                mode="payment",
+                line_items=[{
+                    "price": STRIPE_PRICE_ID,
+                    "quantity": 1,
+                }],
+                success_url=STRIPE_SUCCESS_URL,
+                cancel_url=STRIPE_CANCEL_URL,
+            )
+            checkout_url = session.url
+            st.markdown(f"[Click here to complete payment]({checkout_url})", unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Stripe checkout error: {str(e)}")
