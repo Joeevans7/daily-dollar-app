@@ -1,4 +1,3 @@
-
 # app.py - Streamlit Frontend
 
 import streamlit as st
@@ -17,7 +16,6 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Users table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,8 +28,6 @@ def init_db():
             last_entry_date TEXT
         )
     ''')
-
-    # Entries table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,8 +37,6 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     ''')
-
-    # Winners table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS winners (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,11 +47,9 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     ''')
-
     conn.commit()
     conn.close()
 
-# Run this once when the app starts
 init_db()
 
 # ========== Helper Functions ==========
@@ -178,61 +170,60 @@ def toggle_option(user_id, column, value):
     conn.close()
 
 # ========== Streamlit UI ==========
-st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:")
+st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
 st.title("The Daily Dollar")
-
-menu = ["Login", "Register"]
-choice = st.sidebar.selectbox("Menu", menu)
 
 if "user" not in st.session_state:
     st.session_state.user = None
 
-if choice == "Register":
-    st.subheader("Create Account")
-    username = st.text_input("Username")
-    phone = st.text_input("Phone Number (dashes optional)")
-    password = st.text_input("Password", type="password")
-    confirm = st.text_input("Confirm Password", type="password")
+if st.session_state.user is None:
+    menu = ["Login", "Register"]
+    choice = st.sidebar.selectbox("Menu", menu)
 
-    if st.button("Register"):
-        if len(password) < 7:
-            st.warning("Password must be at least 7 characters.")
-        elif password != confirm:
-            st.warning("Passwords do not match.")
-        else:
-            success, message = create_user(username, phone, password)
-            if success:
-                st.success(message)
-                st.info("Go to the Login page.")
+    if choice == "Register":
+        st.subheader("Create Account")
+        username = st.text_input("Username")
+        phone = st.text_input("Phone Number (dashes optional)")
+        password = st.text_input("Password", type="password")
+        confirm = st.text_input("Confirm Password", type="password")
+
+        if st.button("Register"):
+            if len(password) < 7:
+                st.warning("Password must be at least 7 characters.")
+            elif password != confirm:
+                st.warning("Passwords do not match.")
             else:
-                st.error(message)
+                success, message = create_user(username, phone, password)
+                if success:
+                    st.success(message)
+                    st.info("Go to the Login page.")
+                else:
+                    st.error(message)
 
-elif choice == "Login":
-    st.subheader("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    remember = st.checkbox("Remember me")
+    elif choice == "Login":
+        st.subheader("Login")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        remember = st.checkbox("Remember me")
 
-    if st.button("Login"):
-        user = login_user(username, password)
-        if user:
-            st.session_state.user = user
-            st.success(f"Welcome back, {user[1]}!")
-            st.rerun()
-        else:
-            st.error("Invalid username or password.")
+        if st.button("Login"):
+            user = login_user(username, password)
+            if user:
+                st.session_state.user = user
+                st.success(f"Welcome back, {user[1]}!")
+                st.rerun()
+            else:
+                st.error("Invalid username or password.")
 
-# ========== Dashboard ==========
+# ========== Dashboard/Profile ==========
 if st.session_state.user:
     st.sidebar.success(f"Logged in as: {st.session_state.user[1]}")
-    st.sidebar.markdown("---")
     profile_section = st.sidebar.radio("Navigation", ["Dashboard", "Profile"])
     user_id = st.session_state.user[0]
 
     if profile_section == "Dashboard":
         st.header("Dashboard")
 
-        # Entry Buttons
         st.subheader("Enter Today's Drawing")
         entry_choice = st.radio("Choose Entry Type", ["Main ($1 via Stripe)", "Free Entry"])
         if entry_choice.startswith("Main"):
@@ -244,20 +235,18 @@ if st.session_state.user:
                 result = enter_daily_dollar(user_id, "free")
                 st.success(result) if "successful" in result else st.warning(result)
 
-        # Winners
         st.subheader("Yesterday's Winners")
         winners = get_yesterdays_winners()
         if winners:
             for user_id, entry_type, prize in winners:
-                st.write(f"**{entry_type.capitalize()} Winner**: {get_username_by_id(user_id)} â ${prize}")
+                st.write(f"**{entry_type.capitalize()} Winner**: {get_username_by_id(user_id)} — ${prize}")
         else:
             st.write("No winners recorded yet.")
 
-        # Leaderboard
         st.subheader("Top 10 Entry Streaks")
         top_users = get_top_streaks()
         for rank, (username, streak) in enumerate(top_users, start=1):
-            st.write(f"{rank}. {username} â {streak} day streak")
+            st.write(f"{rank}. {username} — {streak} day streak")
 
     elif profile_section == "Profile":
         st.header("Your Profile")
