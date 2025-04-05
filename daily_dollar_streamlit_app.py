@@ -308,8 +308,7 @@ if st.session_state.user:
             if entry_choice == "Free Entry":
                 if st.button("Enter Free Drawing"):
                     result = enter_daily_dollar(user_id, "free")
-                    st.success(result) if "successful" in result else st.warning(result)
-                st.success(result) if "successful" in result else st.warning(result)        
+                    st.success(result) if "successful" in result else st.warning(result)        
 
         st.subheader("Yesterday's Winners")
         winners = get_yesterdays_winners()
