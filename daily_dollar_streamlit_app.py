@@ -1,5 +1,3 @@
-# app.py - Streamlit Frontend
-
 import streamlit as st
 import sqlite3
 import hashlib
@@ -12,11 +10,13 @@ from streamlit_extras.stx import CookieManager
 DB_PATH = "daily_dollar.db"
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
 
-# Initialize the database if it doesn't exist
+# ========== Cookie Setup ==========
+cookie_manager = CookieManager()
+
+# ========== Database Initialization ==========
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,9 +75,7 @@ def create_user(username, phone, password):
 def login_user(username, password):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT * FROM users WHERE username = ? AND password_hash = ?
-    ''', (username, hash_password(password)))
+    cursor.execute('SELECT * FROM users WHERE username = ? AND password_hash = ?', (username, hash_password(password)))
     user = cursor.fetchone()
     conn.close()
     return user
@@ -120,7 +118,7 @@ def enter_daily_dollar(user_id, entry_type):
     return f"{entry_type.capitalize()} entry successful."
 
 def create_checkout_session(price_id, username, mode="payment"):
-    base_url = "https://thedailydollar.streamlit.app"  # Replace with your real app URL
+    base_url = "https://your-app-name.streamlit.app"  # Replace with actual deployed Streamlit URL
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         line_items=[{"price": price_id, "quantity": 1}],
@@ -173,13 +171,15 @@ def toggle_option(user_id, column, value):
 
 # ========== Streamlit UI ==========
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
-cookie_manager = CookieManager()
-cookie_user = cookie_manager.get("logged_user")
+st.title("The Daily Dollar")
 
+cookie_user = cookie_manager.get("logged_user")
 if "user" not in st.session_state:
     st.session_state.user = None
+if "show_register" not in st.session_state:
+    st.session_state.show_register = False
 
-# Auto-login using cookie
+# Auto-login from cookie
 if st.session_state.user is None and cookie_user:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -188,23 +188,17 @@ if st.session_state.user is None and cookie_user:
     conn.close()
     if user:
         st.session_state.user = user
-st.title("The Daily Dollar")
 
-# Display success or cancel message from Stripe redirect
+# Stripe success/cancel message
 query_params = st.query_params
 if query_params.get("success") == "true":
-    st.success("Payment received! You’ve been entered into today’s drawing.")
+    st.success("Payment received! Youâve been entered into todayâs drawing.")
 elif query_params.get("canceled") == "true":
     st.warning("Payment canceled. You were not entered.")
 
-if "user" not in st.session_state:
-    st.session_state.user = None
-
+# Login/Register UI
 if st.session_state.user is None:
-    menu = ["Login", "Register"]
-    choice = st.sidebar.selectbox("Menu", menu)
-
-    if choice == "Register":
+    if st.session_state.show_register:
         st.subheader("Create Account")
         username = st.text_input("Username")
         phone = st.text_input("Phone Number (dashes optional)")
@@ -220,11 +214,16 @@ if st.session_state.user is None:
                 success, message = create_user(username, phone, password)
                 if success:
                     st.success(message)
-                    st.info("Go to the Login page.")
+                    st.session_state.show_register = False
                 else:
                     st.error(message)
 
-    elif choice == "Login":
+        st.markdown("---")
+        if st.button("Already have an account? Log in"):
+            st.session_state.show_register = False
+            st.rerun()
+
+    else:
         st.subheader("Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
@@ -234,13 +233,18 @@ if st.session_state.user is None:
             user = login_user(username, password)
             if user:
                 st.session_state.user = user
-                cookie_manager.set("logged_user", user[1])  # Save username in browser
+                cookie_manager.set("logged_user", user[1])
                 st.success(f"Welcome back, {user[1]}!")
                 st.rerun()
             else:
                 st.error("Invalid username or password.")
 
-# ========== Dashboard/Profile ==========
+        st.markdown("---")
+        if st.button("Donât have an account? Create one"):
+            st.session_state.show_register = True
+            st.rerun()
+
+# Dashboard/Profile
 if st.session_state.user:
     st.sidebar.success(f"Logged in as: {st.session_state.user[1]}")
     profile_section = st.sidebar.radio("Navigation", ["Dashboard", "Profile"])
@@ -264,14 +268,14 @@ if st.session_state.user:
         winners = get_yesterdays_winners()
         if winners:
             for user_id, entry_type, prize in winners:
-                st.write(f"**{entry_type.capitalize()} Winner**: {get_username_by_id(user_id)} — ${prize}")
+                st.write(f"**{entry_type.capitalize()} Winner**: {get_username_by_id(user_id)} â ${prize}")
         else:
             st.write("No winners recorded yet.")
 
         st.subheader("Top 10 Entry Streaks")
         top_users = get_top_streaks()
         for rank, (username, streak) in enumerate(top_users, start=1):
-            st.write(f"{rank}. {username} — {streak} day streak")
+            st.write(f"{rank}. {username} â {streak} day streak")
 
     elif profile_section == "Profile":
         st.header("Your Profile")
@@ -304,6 +308,6 @@ if st.session_state.user:
             st.markdown(f"[Click here to subscribe]({url})", unsafe_allow_html=True)
 
         if st.button("Sign Out"):
-            cookie_manager.delete("logged_user")  # Clear cookie on logout
+            cookie_manager.delete("logged_user")
             st.session_state.user = None
             st.rerun()
