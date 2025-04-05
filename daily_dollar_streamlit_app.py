@@ -6,18 +6,22 @@ from datetime import datetime, timedelta
 import pytz
 import extra_streamlit_components as stx
 
+# Set page config FIRST
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
 
+# Setup Cookie Manager and read cookie immediately
 cookie_manager = stx.CookieManager()
 cookie_user = cookie_manager.get("logged_user")
 
-# ========== Configuration ==========
+# Configuration
 DB_PATH = "daily_dollar.db"
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
 
-# ========== Session & Cookie-based Login ==========
+# Setup session state for user
 if "user" not in st.session_state:
     st.session_state.user = None
+
+# Auto-login using cookie
 if st.session_state.user is None and cookie_user:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -26,7 +30,7 @@ if st.session_state.user is None and cookie_user:
     conn.close()
     if user:
         st.session_state.user = user
-        st.experimental_rerun()
+        st.experimental_rerun()  # Force rerun to avoid login screen flashing
         
 # ========== Database Initialization ==========
 def init_db():
