@@ -286,32 +286,31 @@ if st.session_state.user:
 
         if entry_choice.startswith("Main"):
             if already_entered_main:
-                st.button("Youâve already entered!", disabled=True)
+                st.button("You’ve already entered!", disabled=True)
             else:
                 url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
                 st.markdown(
                     f"""
-                    <a href="{url}" target="_blank">
-                        <button style='background-color:#4CAF50;color:white;padding:10px 24px;font-size:16px;border:none;border-radius:4px;cursor:pointer;'>
+                    <a href="{url}" target="_blank" style="text-decoration:none;">
+                        <button style='width:100%;background-color:#4CAF50;color:white;padding:10px 24px;font-size:16px;border:none;border-radius:4px;cursor:pointer;'>
                             Pay & Enter via Stripe
                         </button>
-                    </a>"" 
+                    </a>
                     """,
                     unsafe_allow_html=True
-            )
-        
-        else:
+                )
+        elif entry_choice == "Free Entry":
             if st.button("Enter Free Drawing"):
                 result = enter_daily_dollar(user_id, "free")
                 st.success(result) if "successful" in result else st.warning(result)
 
         st.subheader("Yesterday's Winners")
         for uid, entry_type, prize in get_yesterdays_winners():
-            st.write(f"**{entry_type.capitalize()} Winner**: {get_username_by_id(uid)} â ${prize}")
+            st.write(f"**{entry_type.capitalize()} Winner**: {get_username_by_id(uid)} — ${prize:.2f}")
 
         st.subheader("Top 10 Entry Streaks")
         for rank, (username, streak) in enumerate(get_top_streaks(), start=1):
-            st.write(f"{rank}. {username} â {streak} day streak")
+            st.write(f"{rank}. {username} — {streak} day streak")
 
     elif profile_section == "Profile":
         st.header("Your Profile")
@@ -342,7 +341,8 @@ if st.session_state.user:
             url = create_checkout_session("price_1RAEQmCGGJzgCEPTrhWZ904P", username, mode="subscription")
             st.markdown(f"[Click here to subscribe]({url})", unsafe_allow_html=True)
 
-        if st.sidebar.button("Sign Out"):
+        # Moved Sign Out to here
+        if st.button("Sign Out"):
             cookie_manager.delete("logged_user")
             st.session_state.user = None
             st.session_state.show_register = False
