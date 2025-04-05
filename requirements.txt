@@ -1,5 +1,6 @@
 streamlit
 streamlit-extras
+streamlit-extras-stx
 stripe
 pytz
 python-dotenv
