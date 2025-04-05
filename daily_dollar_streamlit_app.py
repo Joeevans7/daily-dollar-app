@@ -355,7 +355,7 @@ if st.session_state.user:
         st.subheader("Top 10 Entry Streaks")
         top_users = get_top_streaks()
         for rank, (username, streak) in enumerate(top_users, start=1):
-            st.write(f"{rank}. {username} â {streak} day streak")
+            st.write(f"{rank}. {username}  {streak} day streak")
 
     elif profile_section == "Profile":
         st.header("Your Profile")
