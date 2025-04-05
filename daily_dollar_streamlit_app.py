@@ -390,4 +390,5 @@ if st.session_state.user:
         if st.button("Sign Out"):
             cookie_manager.delete("logged_user")
             st.session_state.user = None
+            st.session_state.show_register = False  # Force app to show login form
             st.rerun()
