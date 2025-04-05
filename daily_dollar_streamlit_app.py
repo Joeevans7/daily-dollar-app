@@ -291,21 +291,22 @@ if st.session_state.user:
             if already_entered_main:
                 st.button("You’ve already entered!", disabled=True)
             else:
-                if st.button("Pay & Enter via Stripe"):
-                    url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
-                    st.markdown(f"[Click here to pay and enter]({url})", unsafe_allow_html=True)
+                url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
+                st.markdown(
+                    f"""
+                    <a href="{url}" target="_blank">
+                        <button style="background-color:#4CAF50;color:white;padding:10px 24px;font-size:16px;border:none;border-radius:4px;cursor:pointer;">
+                            Pay & Enter via Stripe
+                        </button>
+                    </a>
+                    """,
+                    unsafe_allow_html=True
+                )
         else:
-            url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
-            st.markdown(
-                f"""
-                <a href="{url}" target="_blank">
-                    <button style="background-color:#4CAF50;color:white;padding:10px 24px;font-size:16px;border:none;border-radius:4px;cursor:pointer;">
-                        Pay & Enter via Stripe
-                    </button>
-                </a>
-                """,
-                unsafe_allow_html=True
-            )
+            # Free Entry logic
+            result = enter_daily_dollar(user_id, "free")
+            if st.button("Enter Free Drawing"):
+                st.success(result) if "successful" in result else st.warning(result)        
 
         st.subheader("Yesterday's Winners")
         winners = get_yesterdays_winners()
