@@ -1,3 +1,4 @@
+
 import streamlit as st
 import sqlite3
 import hashlib
@@ -122,15 +123,17 @@ def enter_daily_dollar(user_id, entry_type):
     conn.close()
     return f"{entry_type.capitalize()} entry successful."
 
-def create_checkout_session(price_id, username, mode="payment"):
+def create_checkout_session(price_id, username, mode="payment", redirect="Dashboard"):
     base_url = "https://thedailydollar.streamlit.app"
+    success_url = f"{base_url}?success=true&user={username}&redirect={redirect}"
+    cancel_url = f"{base_url}?canceled=true&redirect={redirect}"
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         line_items=[{"price": price_id, "quantity": 1}],
         mode=mode,
         client_reference_id=username,
-        success_url=f"{base_url}?success=true&user={username}",
-        cancel_url=f"{base_url}?canceled=true"
+        success_url=success_url,
+        cancel_url=cancel_url
     )
     return session.url
 
@@ -295,7 +298,7 @@ if st.session_state.user:
             if already_entered_main:
                 st.button("You’ve already entered!", disabled=True)
             else:
-                url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1]) + "&redirect=Dashboard"
+                url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1], redirect="Dashboard")
                 st.markdown(
                     f'''
                     <a href="{url}" target="_blank" style="text-decoration:none;">
@@ -339,7 +342,7 @@ if st.session_state.user:
 
         st.markdown("---")
         st.markdown("**Daily Auto-Entry** — Never miss a $1 draw!")
-        url = create_checkout_session("price_1RAEQmCGGJzgCEPTrhWZ904P", username, mode="subscription") + "&redirect=Profile"
+        url = create_checkout_session("price_1RAEQmCGGJzgCEPTrhWZ904P", username, mode="subscription", redirect="Profile")
         st.markdown(
             f'''
             <a href="{url}" target="_blank" style="text-decoration:none;">
