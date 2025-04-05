@@ -192,7 +192,7 @@ query_params = st.query_params
 if query_params.get("success") == "true":
     st.success("Payment received! Youâve been entered into todayâs drawing.")
     if st.session_state.user and st.button("Go to Dashboard"):
-        st.experimental_set_query_params()
+        st.query_params()
         st.rerun()
 elif query_params.get("canceled") == "true":
     st.warning("Payment canceled. You were not entered.")
