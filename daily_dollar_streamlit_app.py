@@ -6,36 +6,21 @@ from datetime import datetime, timedelta
 import pytz
 import extra_streamlit_components as stx
 
+# ========== App Configuration ==========
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
-
-# Setup config
 DB_PATH = "daily_dollar.db"
-stripe.api_key = "sk_test_..."
+stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
 
-# Setup cookie
+# ========== Cookie Management ==========
 cookie_manager = stx.CookieManager()
 cookie_user = cookie_manager.get("logged_user")
 
-# Initialize session state
+# ========== Session Initialization ==========
 if "user" not in st.session_state:
     st.session_state.user = None
 if "show_register" not in st.session_state:
     st.session_state.show_register = False
 
-# Try auto-login from cookie
-if st.session_state.user is None and cookie_user:
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE username = ?", (cookie_user,))
-    user = cursor.fetchone()
-    conn.close()
-    if user:
-        st.session_state.user = user
-        st.stop()  
-
-# Configuration
-stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
-        
 # ========== Database Initialization ==========
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -105,14 +90,14 @@ def login_user(username, password):
 
 def is_within_entry_window():
     cst = pytz.timezone('US/Central')
-    now_cst = datetime.now(pytz.utc).astimezone(cst)
-    entry_start = now_cst.replace(hour=18, minute=1, second=0, microsecond=0)
-    entry_end = now_cst.replace(hour=16, minute=59, second=0, microsecond=0)
-    if now_cst.hour < 17:
-        entry_start -= timedelta(days=1)
+    now = datetime.now(pytz.utc).astimezone(cst)
+    start = now.replace(hour=18, minute=1, second=0, microsecond=0)
+    end = now.replace(hour=16, minute=59, second=0, microsecond=0)
+    if now.hour < 17:
+        start -= timedelta(days=1)
     else:
-        entry_end += timedelta(days=1)
-    return entry_start <= now_cst <= entry_end
+        end += timedelta(days=1)
+    return start <= now <= end
 
 def enter_daily_dollar(user_id, entry_type):
     if entry_type not in ['main', 'free']:
@@ -131,17 +116,14 @@ def enter_daily_dollar(user_id, entry_type):
         cursor.execute('SELECT last_entry_date, streak FROM users WHERE id = ?', (user_id,))
         last_entry_date, streak = cursor.fetchone()
         yesterday = (datetime.now(pytz.utc).astimezone(pytz.timezone('US/Central')).date() - timedelta(days=1)).isoformat()
-        if last_entry_date == yesterday:
-            streak += 1
-        else:
-            streak = 1
+        streak = streak + 1 if last_entry_date == yesterday else 1
         cursor.execute('UPDATE users SET last_entry_date = ?, streak = ? WHERE id = ?', (today, streak, user_id))
     conn.commit()
     conn.close()
     return f"{entry_type.capitalize()} entry successful."
 
 def create_checkout_session(price_id, username, mode="payment"):
-    base_url = "https://thedailydollar.streamlit.app"  # Replace with your real app URL
+    base_url = "https://thedailydollar.streamlit.app"
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         line_items=[{"price": price_id, "quantity": 1}],
@@ -195,11 +177,6 @@ def toggle_option(user_id, column, value):
 # ========== Streamlit UI ==========
 st.title("The Daily Dollar")
 
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "show_register" not in st.session_state:
-    st.session_state.show_register = False
-
 # Auto-login from cookie
 if st.session_state.user is None and cookie_user:
     conn = sqlite3.connect(DB_PATH)
@@ -210,131 +187,95 @@ if st.session_state.user is None and cookie_user:
     if user:
         st.session_state.user = user
 
-# Stripe success/cancel message
+# Handle Stripe success/cancel messages
 query_params = st.query_params
-
 if query_params.get("success") == "true":
-    st.success("Payment received! You’ve been entered into today’s drawing.")
-
-    # Optional: "Go to Dashboard" button if user is logged in
-    if st.session_state.user:
-        if st.button("Go to Dashboard"):
-            st.experimental_set_query_params()  # Clear ?success=true from URL
-            st.rerun()
-
+    st.success("Payment received! Youâve been entered into todayâs drawing.")
+    if st.session_state.user and st.button("Go to Dashboard"):
+        st.experimental_set_query_params()
+        st.rerun()
 elif query_params.get("canceled") == "true":
     st.warning("Payment canceled. You were not entered.")
 
 # Login/Register UI
 if st.session_state.user is None:
-    st.title("The Daily Dollar")
-
     if st.session_state.show_register:
         st.subheader("Create Account")
         username = st.text_input("Username")
-        phone = st.text_input("Phone Number (dashes optional)")
+        phone = st.text_input("Phone Number")
         password = st.text_input("Password", type="password")
         confirm = st.text_input("Confirm Password", type="password")
-
         if st.button("Register"):
             if len(password) < 7:
                 st.warning("Password must be at least 7 characters.")
             elif password != confirm:
                 st.warning("Passwords do not match.")
             else:
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                try:
-                    cursor.execute("INSERT INTO users (username, phone, password_hash) VALUES (?, ?, ?)", 
-                        (username, phone, hashlib.sha256(password.encode()).hexdigest()))
-                    conn.commit()
+                success, msg = create_user(username, phone, password)
+                if success:
+                    conn = sqlite3.connect(DB_PATH)
+                    cursor = conn.cursor()
                     user = cursor.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+                    conn.close()
                     st.session_state.user = user
                     cookie_manager.set("logged_user", user[1])
                     st.success("Account created! You're now logged in.")
                     st.rerun()
-                except sqlite3.IntegrityError:
-                    st.error("Username already exists.")
-                finally:
-                    conn.close()
-
+                else:
+                    st.error(msg)
         if st.button("Already have an account? Log in"):
             st.session_state.show_register = False
             st.rerun()
-
     else:
         st.subheader("Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         remember = st.checkbox("Remember me")
-
         if st.button("Login"):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM users WHERE username = ? AND password_hash = ?", 
-                (username, hashlib.sha256(password.encode()).hexdigest()))
-            user = cursor.fetchone()
-            conn.close()
+            user = login_user(username, password)
             if user:
                 st.session_state.user = user
-                cookie_manager.set("logged_user", user[1])
+                if remember:
+                    cookie_manager.set("logged_user", user[1])
                 st.success("Welcome back!")
                 st.rerun()
             else:
                 st.error("Invalid username or password.")
-
         if st.button("Don't have an account? Create one"):
             st.session_state.show_register = True
             st.rerun()
 
-# If user is logged in, show main app UI
+# Logged-in UI
 if st.session_state.user:
     st.sidebar.success(f"Logged in as: {st.session_state.user[1]}")
     st.title("Dashboard")
-    st.write("Your dashboard and app logic goes here.")
+
     if "profile_section" not in st.session_state:
-        st.session_state.profile_section = "About"  # default on first load
+        st.session_state.profile_section = "About"
 
     profile_section = st.sidebar.radio(
         "Navigation",
         ["About", "Dashboard", "Profile"],
         index=["About", "Dashboard", "Profile"].index(st.session_state.profile_section)
     )
+
     user_id = st.session_state.user[0]
 
     if profile_section == "About":
         st.header("About The Daily Dollar")
-
         st.markdown("""
-        **How It Works**
-
-        - Every day, you can enter **The Daily Dollar** drawing for just $1.
-        - All paid entries go into a prize pool — one winner is chosen daily at 4 PM CST.
-        - You can also enter **for free** once per day, which gives you a chance to win 3% of the main prize.
-        - The entry window is open from **6:01 PM (CST)** until 4:59 PM (CST)** the following day.
-        - Winners are announced at **5:30 PM (CST)** and displayed on the dashboard.
-        - The arrow on the top left gives you access to the menu to navigate the app.
-
-        **Streaks & Auto Entry**
-    
-        - If you enter the main draw on consecutive days, your streak increases — top streaks are shown in the leaderboard.
-        - You can enable **Auto Entry** in your profile so you’re entered automatically each day via Stripe.
-
-        **Transparency**
-    
-        - We take a 7% platform fee from the prize pool to keep the app running.
-        - The rest goes directly to that day’s winner!
-
-        Good luck, and thanks for playing!
+        - **$1 Entry**: Enter the daily drawing for a chance to win the pot.
+        - **Free Entry**: Enter for free and win 3% of the main prize.
+        - **Streaks**: Consecutive daily entries build your streak and leaderboard position.
+        - **Entry Time**: From 6:01 PM (CST) to 4:59 PM the next day.
+        - **Daily Draw**: Winners picked at 4 PM CST, announced at 5:30 PM.
+        - **Platform Fee**: 7% taken from pot to fund operations.
         """)
 
-    if profile_section == "Dashboard":
-        st.header("Dashboard")
-
-        st.subheader("Enter Today's Drawing")
+    elif profile_section == "Dashboard":
+        st.header("Enter Today's Drawing")
         entry_choice = st.radio("Choose Entry Type", ["Main ($1 via Stripe)", "Free Entry"])
 
-        # Check if user already entered main draw today
         today = datetime.now(pytz.utc).astimezone(pytz.timezone('US/Central')).date().isoformat()
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -342,43 +283,29 @@ if st.session_state.user:
         already_entered_main = cursor.fetchone() is not None
         conn.close()
 
-        if query_params.get("success") == "true":
-            st.success("Payment received! You’ve been entered into today’s drawing.")
-
         if entry_choice.startswith("Main"):
             if already_entered_main:
-                st.button("You’ve already entered!", disabled=True)
+                st.button("Youâve already entered!", disabled=True)
             else:
                 url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
                 st.markdown(
-                    f"""
-                    <a href="{url}" target="_blank">
-                        <button style="background-color:#4CAF50;color:white;padding:10px 24px;font-size:16px;border:none;border-radius:4px;cursor:pointer;">
+                    f""<a href='{url}' target='_blank'>
+                        <button style='background-color:#4CAF50;color:white;padding:10px 24px;font-size:16px;border:none;border-radius:4px;cursor:pointer;'>
                             Pay & Enter via Stripe
                         </button>
-                    </a>
-                    """,
-                    unsafe_allow_html=True
-                )
+                    </a>"", unsafe_allow_html=True)
         else:
-            # Free Entry logic
-            if entry_choice == "Free Entry":
-                if st.button("Enter Free Drawing"):
-                    result = enter_daily_dollar(user_id, "free")
-                    st.success(result) if "successful" in result else st.warning(result)        
+            if st.button("Enter Free Drawing"):
+                result = enter_daily_dollar(user_id, "free")
+                st.success(result) if "successful" in result else st.warning(result)
 
         st.subheader("Yesterday's Winners")
-        winners = get_yesterdays_winners()
-        if winners:
-            for user_id, entry_type, prize in winners:
-                st.write(f"**{entry_type.capitalize()} Winner**: {get_username_by_id(user_id)} â ${prize}")
-        else:
-            st.write("No winners recorded yet.")
+        for uid, entry_type, prize in get_yesterdays_winners():
+            st.write(f"**{entry_type.capitalize()} Winner**: {get_username_by_id(uid)} â ${prize}")
 
         st.subheader("Top 10 Entry Streaks")
-        top_users = get_top_streaks()
-        for rank, (username, streak) in enumerate(top_users, start=1):
-            st.write(f"{rank}. {username}  {streak} day streak")
+        for rank, (username, streak) in enumerate(get_top_streaks(), start=1):
+            st.write(f"{rank}. {username} â {streak} day streak")
 
     elif profile_section == "Profile":
         st.header("Your Profile")
@@ -405,7 +332,6 @@ if st.session_state.user:
             st.success("Auto-entry preference updated!")
 
         st.markdown("---")
-        st.markdown("**Want to automate your $1 entries?**")
         if st.button("Subscribe to Daily Auto-Entry"):
             url = create_checkout_session("price_1RAEQmCGGJzgCEPTrhWZ904P", username, mode="subscription")
             st.markdown(f"[Click here to subscribe]({url})", unsafe_allow_html=True)
