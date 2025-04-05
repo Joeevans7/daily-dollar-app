@@ -222,8 +222,13 @@ if st.session_state.user is None:
             else:
                 success, message = create_user(username, phone, password)
                 if success:
-                    st.success(message)
-                    st.session_state.show_register = False
+                    # Auto-login after successful registration
+                    user = login_user(username, password)
+                    if user:
+                        st.session_state.user = user
+                        cookie_manager.set("logged_user", user[1])  # store in cookie
+                        st.success("Account created! Welcome, you're now logged in.")            
+                        st.rerun()
                 else:
                     st.error(message)
 
@@ -249,7 +254,7 @@ if st.session_state.user is None:
                 st.error("Invalid username or password.")
 
         st.markdown("---")
-        if st.button("Donât have an account? Create one"):
+        if st.button("Don't have an account? Create one"):
             st.session_state.show_register = True
             st.rerun()
 
@@ -284,9 +289,17 @@ if st.session_state.user:
                     url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
                     st.markdown(f"[Click here to pay and enter]({url})", unsafe_allow_html=True)
         else:
-            if st.button("Enter Free Drawing"):
-                result = enter_daily_dollar(user_id, "free")
-                st.success(result) if "successful" in result else st.warning(result)
+            url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
+            st.markdown(
+                f"""
+                <a href="{url}" target="_blank">
+                    <button style="background-color:#4CAF50;color:white;padding:10px 24px;font-size:16px;border:none;border-radius:4px;cursor:pointer;">
+                        Pay & Enter via Stripe
+                    </button>
+                </a>
+                """,
+                unsafe_allow_html=True
+            )
 
         st.subheader("Yesterday's Winners")
         winners = get_yesterdays_winners()
