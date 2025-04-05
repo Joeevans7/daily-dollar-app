@@ -268,7 +268,8 @@ if st.session_state.user:
         - **Free Entry**: Enter for free and win 3% of the main prize.
         - **Streaks**: Consecutive daily entries build your streak and leaderboard position.
         - **Entry Time**: From 6:01 PM (CST) to 4:59 PM the next day.
-        - **Daily Draw**: Winners picked at 4 PM CST, announced at 5:30 PM.
+        - ** Auto-Entry**: In the Profile page enroll in Auto-Entry to be automatically entered in the Daily Dollar. 
+        - **Daily Draw**: Winners picked at 5 PM CST, announced at 5:30 PM.
         - **Platform Fee**: 7% taken from pot to fund operations.
         """)
 
