@@ -15,11 +15,10 @@ DB_PATH = "daily_dollar.db"
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
 
 # ========== Cookie Manager ==========
-@st.cache_resource
-def get_cookie_manager():
-    return stx.CookieManager()
+if "cookie_manager" not in st.session_state:
+    st.session_state.cookie_manager = stx.CookieManager()
 
-cookie_manager = get_cookie_manager()
+cookie_manager = st.session_state.cookie_manager
 
 # ========== Database Initialization ==========
 def init_db():
