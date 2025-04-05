@@ -8,17 +8,12 @@ import extra_streamlit_components as stx  # Correct import
 
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
 
-cookie_manager = stx.CookieManager()
-
 # ========== Configuration ==========
 DB_PATH = "daily_dollar.db"
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
 
 # ========== Cookie Manager ==========
-if "cookie_manager" not in st.session_state:
-    st.session_state.cookie_manager = stx.CookieManager()
-
-cookie_manager = st.session_state.cookie_manager
+cookie_manager = stx.CookieManager()
 
 # ========== Database Initialization ==========
 def init_db():
