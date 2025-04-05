@@ -8,6 +8,7 @@ import extra_streamlit_components as stx
 
 # Set page config FIRST
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
+DB_PATH = "daily_dollar.db"
 
 # Setup Cookie Manager and read cookie immediately
 cookie_manager = stx.CookieManager()
@@ -29,7 +30,6 @@ if st.session_state.user is None and cookie_user:
         st.experimental_rerun()  # Force rerun to avoid login screen flashing
 
 # Configuration
-DB_PATH = "daily_dollar.db"
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
         
 # ========== Database Initialization ==========
