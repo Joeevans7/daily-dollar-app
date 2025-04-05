@@ -6,6 +6,7 @@ import hashlib
 import stripe
 from datetime import datetime, timedelta
 import pytz
+from streamlit_extras.stx import CookieManager
 
 # ========== Configuration ==========
 DB_PATH = "daily_dollar.db"
@@ -172,6 +173,21 @@ def toggle_option(user_id, column, value):
 
 # ========== Streamlit UI ==========
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
+cookie_manager = CookieManager()
+cookie_user = cookie_manager.get("logged_user")
+
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+# Auto-login using cookie
+if st.session_state.user is None and cookie_user:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE username = ?", (cookie_user,))
+    user = cursor.fetchone()
+    conn.close()
+    if user:
+        st.session_state.user = user
 st.title("The Daily Dollar")
 
 # Display success or cancel message from Stripe redirect
@@ -218,6 +234,7 @@ if st.session_state.user is None:
             user = login_user(username, password)
             if user:
                 st.session_state.user = user
+                cookie_manager.set("logged_user", user[1])  # Save username in browser
                 st.success(f"Welcome back, {user[1]}!")
                 st.rerun()
             else:
