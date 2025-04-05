@@ -192,8 +192,16 @@ if st.session_state.user is None and cookie_user:
 
 # Stripe success/cancel message
 query_params = st.query_params
+
 if query_params.get("success") == "true":
-    st.success("Payment received! Youâve been entered into todayâs drawing.")
+    st.success("Payment received! You’ve been entered into today’s drawing.")
+
+    # Optional: "Go to Dashboard" button if user is logged in
+    if st.session_state.user:
+        if st.button("Go to Dashboard"):
+            st.experimental_set_query_params()  # Clear ?success=true from URL
+            st.rerun()
+
 elif query_params.get("canceled") == "true":
     st.warning("Payment canceled. You were not entered.")
 
