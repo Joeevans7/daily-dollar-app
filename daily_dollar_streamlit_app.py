@@ -289,13 +289,16 @@ if st.session_state.user:
             else:
                 url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
                 st.markdown(
-f"""
-<a href="{url}" target="_blank">
+                    f"""
+                    <a href="{url}" target="_blank">
                         <button style='background-color:#4CAF50;color:white;padding:10px 24px;font-size:16px;border:none;border-radius:4px;cursor:pointer;'>
                             Pay & Enter via Stripe
                         </button>
-                    </a>"", unsafe_allow_html=True)
-"""
+                    </a>"" 
+                    """,
+                    unsafe_allow_html=True
+            )
+        
         else:
             if st.button("Enter Free Drawing"):
                 result = enter_daily_dollar(user_id, "free")
