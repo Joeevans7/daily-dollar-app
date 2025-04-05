@@ -256,10 +256,25 @@ if st.session_state.user:
 
         st.subheader("Enter Today's Drawing")
         entry_choice = st.radio("Choose Entry Type", ["Main ($1 via Stripe)", "Free Entry"])
+
+        # Check if user already entered main draw today
+        today = datetime.now(pytz.utc).astimezone(pytz.timezone('US/Central')).date().isoformat()
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM entries WHERE user_id = ? AND date = ? AND entry_type = "main"', (user_id, today))
+        already_entered_main = cursor.fetchone() is not None
+        conn.close()
+
+        if query_params.get("success") == "true":
+            st.success("Payment received! You’ve been entered into today’s drawing.")
+
         if entry_choice.startswith("Main"):
-            if st.button("Pay & Enter via Stripe"):
-                url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
-                st.markdown(f"[Click here to pay and enter]({url})", unsafe_allow_html=True)
+            if already_entered_main:
+                st.button("You’ve already entered!", disabled=True)
+            else:
+                if st.button("Pay & Enter via Stripe"):
+                    url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
+                    st.markdown(f"[Click here to pay and enter]({url})", unsafe_allow_html=True)
         else:
             if st.button("Enter Free Drawing"):
                 result = enter_daily_dollar(user_id, "free")
