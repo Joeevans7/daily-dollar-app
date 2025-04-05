@@ -4,7 +4,7 @@ import hashlib
 import stripe
 from datetime import datetime, timedelta
 import pytz
-from streamlit_extras.stx import CookieManager
+from streamlit_extras_stx import CookieManager
 
 # ========== Configuration ==========
 DB_PATH = "daily_dollar.db"
