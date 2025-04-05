@@ -4,20 +4,14 @@ import hashlib
 import stripe
 from datetime import datetime, timedelta
 import pytz
-import extra_streamlit_components as stx
-
-@st.cache_resource
-def get_manager():
-    return stx.CookieManager()
-
-cookie_manager = get_manager()  # this will persist the manager across reruns
+import extra_streamlit_components as stx  # Correct import
 
 # ========== Configuration ==========
 DB_PATH = "daily_dollar.db"
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
 
-# ========== Cookie Setup ==========
-cookie_manager = CookieManager()
+# ========== Cookie Manager ==========
+cookie_manager = stx.CookieManager()
 
 # ========== Database Initialization ==========
 def init_db():
@@ -124,7 +118,7 @@ def enter_daily_dollar(user_id, entry_type):
     return f"{entry_type.capitalize()} entry successful."
 
 def create_checkout_session(price_id, username, mode="payment"):
-    base_url = "https://your-app-name.streamlit.app"  # Replace with actual deployed Streamlit URL
+    base_url = "https://your-app-name.streamlit.app"  # Replace with your real app URL
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         line_items=[{"price": price_id, "quantity": 1}],
