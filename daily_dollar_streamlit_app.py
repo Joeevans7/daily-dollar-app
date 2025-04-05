@@ -5,6 +5,8 @@ import stripe
 from datetime import datetime, timedelta
 import pytz
 import extra_streamlit_components as stx  # Correct import
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
 
