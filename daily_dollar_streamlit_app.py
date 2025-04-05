@@ -5,9 +5,10 @@ import stripe
 from datetime import datetime, timedelta
 import pytz
 import extra_streamlit_components as stx  # Correct import
-cookie_manager = stx.CookieManager()
 
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
+
+cookie_manager = stx.CookieManager()
 
 # ========== Configuration ==========
 DB_PATH = "daily_dollar.db"
