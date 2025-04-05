@@ -1,4 +1,5 @@
 streamlit
-stripe
-python-dotenv
 streamlit-extras
+stripe
+pytz
+python-dotenv
