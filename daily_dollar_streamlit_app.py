@@ -26,6 +26,7 @@ if st.session_state.user is None and cookie_user:
     conn.close()
     if user:
         st.session_state.user = user
+        st.experimental_rerun()
         
 # ========== Database Initialization ==========
 def init_db():
@@ -344,7 +345,6 @@ if st.session_state.user:
                 )
         else:
             # Free Entry logic
-            result = enter_daily_dollar(user_id, "free")
             if entry_choice == "Free Entry":
                 if st.button("Enter Free Drawing"):
                     result = enter_daily_dollar(user_id, "free")
