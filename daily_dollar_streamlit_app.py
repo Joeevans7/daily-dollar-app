@@ -31,7 +31,7 @@ if st.session_state.user is None and cookie_user:
     conn.close()
     if user:
         st.session_state.user = user
-        st.rerun()  
+        st.stop()  
 
 # Configuration
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
