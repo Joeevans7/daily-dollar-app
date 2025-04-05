@@ -175,7 +175,22 @@ def toggle_option(user_id, column, value):
     conn.close()
 
 # ========== Streamlit UI ==========
-st.title("The Daily Dollar")
+
+# Handle Stripe success/cancel messages and routing
+query_params = st.query_params
+redirect_target = query_params.get("redirect", ["Dashboard"])[0]
+
+# Restore session after payment
+if query_params.get("success") == "true":
+    st.success("Payment received! You’ve been entered into today’s drawing.")
+    st.session_state.profile_section = redirect_target
+    st.experimental_set_query_params()
+    st.rerun()
+elif query_params.get("canceled") == "true":
+    st.warning("Payment canceled. You were not entered.")
+    st.session_state.profile_section = redirect_target
+    st.experimental_set_query_params()
+    st.rerun()
 
 # Auto-login from cookie
 if st.session_state.user is None and cookie_user:
@@ -187,18 +202,9 @@ if st.session_state.user is None and cookie_user:
     if user:
         st.session_state.user = user
 
-# Handle Stripe success/cancel messages
-query_params = st.query_params
-if query_params.get("success") == "true":
-    st.success("Payment received! Youâve been entered into todayâs drawing.")
-    if st.session_state.user and st.button("Go to Dashboard"):
-        st.query_params()
-        st.rerun()
-elif query_params.get("canceled") == "true":
-    st.warning("Payment canceled. You were not entered.")
-
 # Login/Register UI
 if st.session_state.user is None:
+    st.title("The Daily Dollar")
     if st.session_state.show_register:
         st.subheader("Create Account")
         username = st.text_input("Username")
@@ -248,7 +254,6 @@ if st.session_state.user is None:
 # Logged-in UI
 if st.session_state.user:
     st.sidebar.success(f"Logged in as: {st.session_state.user[1]}")
-    st.title("Dashboard")
 
     if "profile_section" not in st.session_state:
         st.session_state.profile_section = "About"
@@ -262,18 +267,20 @@ if st.session_state.user:
     user_id = st.session_state.user[0]
 
     if profile_section == "About":
+        st.title("The Daily Dollar")
         st.header("About The Daily Dollar")
         st.markdown("""
         - **$1 Entry**: Enter the daily drawing for a chance to win the pot.
         - **Free Entry**: Enter for free and win 3% of the main prize.
         - **Streaks**: Consecutive daily entries build your streak and leaderboard position.
         - **Entry Time**: From 6:01 PM (CST) to 4:59 PM the next day.
-        - ** Auto-Entry**: In the Profile page enroll in Auto-Entry to be automatically entered in the Daily Dollar. 
+        - **Auto-Entry**: In the Profile page, enable Auto-Entry and be entered automatically each day.
         - **Daily Draw**: Winners picked at 5 PM CST, announced at 5:30 PM.
         - **Platform Fee**: 7% taken from pot to fund operations.
         """)
 
     elif profile_section == "Dashboard":
+        st.title("The Daily Dollar")
         st.header("Enter Today's Drawing")
         entry_choice = st.radio("Choose Entry Type", ["Main ($1 via Stripe)", "Free Entry"])
 
@@ -288,15 +295,15 @@ if st.session_state.user:
             if already_entered_main:
                 st.button("You’ve already entered!", disabled=True)
             else:
-                url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1])
+                url = create_checkout_session("price_1R9yRkCGGJzgCEPTOnnnvEKi", st.session_state.user[1]) + "&redirect=Dashboard"
                 st.markdown(
-                    f"""
+                    f'''
                     <a href="{url}" target="_blank" style="text-decoration:none;">
                         <button style='width:100%;background-color:#4CAF50;color:white;padding:10px 24px;font-size:16px;border:none;border-radius:4px;cursor:pointer;'>
                             Pay & Enter via Stripe
                         </button>
                     </a>
-                    """,
+                    ''',
                     unsafe_allow_html=True
                 )
         elif entry_choice == "Free Entry":
@@ -313,11 +320,11 @@ if st.session_state.user:
             st.write(f"{rank}. {username} — {streak} day streak")
 
     elif profile_section == "Profile":
+        st.title("The Daily Dollar")
         st.header("Your Profile")
         username = st.session_state.user[1]
         phone = st.session_state.user[2]
         sms_opt_in = bool(st.session_state.user[4])
-        auto_entry = bool(st.session_state.user[5])
 
         st.write(f"**Username:** {username}")
         new_phone = st.text_input("Phone Number", value=phone)
@@ -326,22 +333,24 @@ if st.session_state.user:
             st.success("Phone number updated!")
 
         sms_toggle = st.checkbox("Receive SMS notifications", value=sms_opt_in)
-        auto_toggle = st.checkbox("Enable auto-entry", value=auto_entry)
-
         if sms_toggle != sms_opt_in:
             toggle_option(user_id, "sms_opt_in", int(sms_toggle))
             st.success("SMS preference updated!")
 
-        if auto_toggle != auto_entry:
-            toggle_option(user_id, "auto_entry", int(auto_toggle))
-            st.success("Auto-entry preference updated!")
-
         st.markdown("---")
-        if st.button("Subscribe to Daily Auto-Entry"):
-            url = create_checkout_session("price_1RAEQmCGGJzgCEPTrhWZ904P", username, mode="subscription")
-            st.markdown(f"[Click here to subscribe]({url})", unsafe_allow_html=True)
+        st.markdown("**Daily Auto-Entry** — Never miss a $1 draw!")
+        url = create_checkout_session("price_1RAEQmCGGJzgCEPTrhWZ904P", username, mode="subscription") + "&redirect=Profile"
+        st.markdown(
+            f'''
+            <a href="{url}" target="_blank" style="text-decoration:none;">
+                <button style='width:100%;background-color:#008CBA;color:white;padding:10px 24px;font-size:16px;border:none;border-radius:4px;cursor:pointer;'>
+                    Enable Auto-Entry (Subscribe)
+                </button>
+            </a>
+            ''',
+            unsafe_allow_html=True
+        )
 
-        # Moved Sign Out to here
         if st.button("Sign Out"):
             cookie_manager.delete("logged_user")
             st.session_state.user = None
