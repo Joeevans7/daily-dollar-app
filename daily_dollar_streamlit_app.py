@@ -120,7 +120,7 @@ def enter_daily_dollar(user_id, entry_type):
     return f"{entry_type.capitalize()} entry successful."
 
 def create_checkout_session(price_id, username, mode="payment"):
-    base_url = "https://your-app-name.streamlit.app"  # Replace with your real app URL
+    base_url = "https://thedailydollar.streamlit.app"  # Replace with your real app URL
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         line_items=[{"price": price_id, "quantity": 1}],
