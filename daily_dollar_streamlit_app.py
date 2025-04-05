@@ -4,7 +4,13 @@ import hashlib
 import stripe
 from datetime import datetime, timedelta
 import pytz
-from streamlit_extras_stx import CookieManager
+import extra_streamlit_components as stx
+
+@st.cache_resource
+def get_manager():
+    return stx.CookieManager()
+
+cookie_manager = get_manager()  # this will persist the manager across reruns
 
 # ========== Configuration ==========
 DB_PATH = "daily_dollar.db"
