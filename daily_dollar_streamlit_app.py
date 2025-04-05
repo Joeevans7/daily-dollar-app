@@ -6,19 +6,23 @@ from datetime import datetime, timedelta
 import pytz
 import extra_streamlit_components as stx
 
-# Set page config FIRST
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
-DB_PATH = "daily_dollar.db"
 
-# Setup Cookie Manager and read cookie immediately
+# Setup config
+DB_PATH = "daily_dollar.db"
+stripe.api_key = "sk_test_..."
+
+# Setup cookie
 cookie_manager = stx.CookieManager()
 cookie_user = cookie_manager.get("logged_user")
 
-# Setup session state for user
+# Initialize session state
 if "user" not in st.session_state:
     st.session_state.user = None
+if "show_register" not in st.session_state:
+    st.session_state.show_register = False
 
-# Auto-login using cookie
+# Try auto-login from cookie
 if st.session_state.user is None and cookie_user:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -27,7 +31,7 @@ if st.session_state.user is None and cookie_user:
     conn.close()
     if user:
         st.session_state.user = user
-        st.stop()  # just silently wait until next rerun
+        st.rerun()  
 
 # Configuration
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
@@ -223,6 +227,8 @@ elif query_params.get("canceled") == "true":
 
 # Login/Register UI
 if st.session_state.user is None:
+    st.title("The Daily Dollar")
+
     if st.session_state.show_register:
         st.subheader("Create Account")
         username = st.text_input("Username")
@@ -236,19 +242,22 @@ if st.session_state.user is None:
             elif password != confirm:
                 st.warning("Passwords do not match.")
             else:
-                success, message = create_user(username, phone, password)
-                if success:
-                    # Auto-login after successful registration
-                    user = login_user(username, password)
-                    if user:
-                        st.session_state.user = user
-                        cookie_manager.set("logged_user", user[1])  # store in cookie
-                        st.success("Account created! Welcome, you're now logged in.")            
-                        st.rerun()
-                else:
-                    st.error(message)
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("INSERT INTO users (username, phone, password_hash) VALUES (?, ?, ?)", 
+                        (username, phone, hashlib.sha256(password.encode()).hexdigest()))
+                    conn.commit()
+                    user = cursor.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+                    st.session_state.user = user
+                    cookie_manager.set("logged_user", user[1])
+                    st.success("Account created! You're now logged in.")
+                    st.rerun()
+                except sqlite3.IntegrityError:
+                    st.error("Username already exists.")
+                finally:
+                    conn.close()
 
-        st.markdown("---")
         if st.button("Already have an account? Log in"):
             st.session_state.show_register = False
             st.rerun()
@@ -260,20 +269,29 @@ if st.session_state.user is None:
         remember = st.checkbox("Remember me")
 
         if st.button("Login"):
-            user = login_user(username, password)
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users WHERE username = ? AND password_hash = ?", 
+                (username, hashlib.sha256(password.encode()).hexdigest()))
+            user = cursor.fetchone()
+            conn.close()
             if user:
                 st.session_state.user = user
                 cookie_manager.set("logged_user", user[1])
-                st.session_state.profile_section = "Dashboard"  # Set sidebar to Dashboard
-                st.success(f"Welcome back, {user[1]}!")
+                st.success("Welcome back!")
                 st.rerun()
             else:
                 st.error("Invalid username or password.")
 
-        st.markdown("---")
         if st.button("Don't have an account? Create one"):
             st.session_state.show_register = True
             st.rerun()
+
+# If user is logged in, show main app UI
+if st.session_state.user:
+    st.sidebar.success(f"Logged in as: {st.session_state.user[1]}")
+    st.title("Dashboard")
+    st.write("Your dashboard and app logic goes here.")
 
 # Dashboard/Profile
 if st.session_state.user:
@@ -396,8 +414,8 @@ if st.session_state.user:
             url = create_checkout_session("price_1RAEQmCGGJzgCEPTrhWZ904P", username, mode="subscription")
             st.markdown(f"[Click here to subscribe]({url})", unsafe_allow_html=True)
 
-        if st.button("Sign Out"):
+        if st.sidebar.button("Sign Out"):
             cookie_manager.delete("logged_user")
             st.session_state.user = None
-            st.session_state.show_register = False  # Force app to show login form
+            st.session_state.show_register = False
             st.rerun()
