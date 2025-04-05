@@ -304,5 +304,6 @@ if st.session_state.user:
             st.markdown(f"[Click here to subscribe]({url})", unsafe_allow_html=True)
 
         if st.button("Sign Out"):
+            cookie_manager.delete("logged_user")  # Clear cookie on logout
             st.session_state.user = None
             st.rerun()
