@@ -4,7 +4,7 @@ import hashlib
 import stripe
 from datetime import datetime, timedelta
 import pytz
-import extra_streamlit_components as stx  # Correct import
+import extra_streamlit_components as stx
 
 st.set_page_config(page_title="The Daily Dollar", page_icon=":moneybag:", initial_sidebar_state="collapsed")
 
@@ -15,10 +15,9 @@ cookie_user = cookie_manager.get("logged_user")
 DB_PATH = "daily_dollar.db"
 stripe.api_key = "sk_test_51R9yN9CGGJzgCEPTGciHIWhNv5VVZjumDZbiaPSD5PHMYjTDMpJTdng7RfC2OBdaFLQnuGicYJYHoN8qYECkX8jy00nxZBNMFZ"
 
-# ========== Cookie Manager ==========
+# ========== Session & Cookie-based Login ==========
 if "user" not in st.session_state:
     st.session_state.user = None
-
 if st.session_state.user is None and cookie_user:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
