@@ -267,8 +267,33 @@ if st.session_state.user is None:
 # Dashboard/Profile
 if st.session_state.user:
     st.sidebar.success(f"Logged in as: {st.session_state.user[1]}")
-    profile_section = st.sidebar.radio("Navigation", ["Dashboard", "Profile"])
+    profile_section = st.sidebar.radio("Navigation", ["About", "Dashboard", "Profile"])
     user_id = st.session_state.user[0]
+
+    if profile_section == "About":
+    st.header("About The Daily Dollar")
+
+    st.markdown("""
+    **How It Works**
+
+    - Every day, you can enter **The Daily Dollar** drawing for just $1.
+    - All paid entries go into a prize pool — one winner is chosen daily at 4 PM CST.
+    - You can also enter **for free** once per day, which gives you a chance to win 3% of the main prize.
+    - The entry window is open from **6:01 PM (CST)** until 4:59 PM (CST)** the following day.
+    - Winners are announced at **5:30 PM (CST)** and displayed on the dashboard.
+
+    **Streaks & Auto Entry**
+    
+    - If you enter the main draw on consecutive days, your streak increases — top streaks are shown in the leaderboard.
+    - You can enable **Auto Entry** in your profile so you’re entered automatically each day via Stripe.
+
+    **Transparency**
+    
+    - We take a 7% platform fee from the prize pool to keep the app running.
+    - The rest goes directly to that day’s winner!
+
+    Good luck, and thanks for playing!
+    """)
 
     if profile_section == "Dashboard":
         st.header("Dashboard")
