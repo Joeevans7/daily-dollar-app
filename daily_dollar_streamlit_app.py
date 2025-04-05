@@ -191,7 +191,6 @@ def toggle_option(user_id, column, value):
 # ========== Streamlit UI ==========
 st.title("The Daily Dollar")
 
-cookie_user = cookie_manager.get("logged_user")
 if "user" not in st.session_state:
     st.session_state.user = None
 if "show_register" not in st.session_state:
