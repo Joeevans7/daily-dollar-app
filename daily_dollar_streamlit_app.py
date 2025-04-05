@@ -287,12 +287,6 @@ if st.session_state.user is None:
             st.session_state.show_register = True
             st.rerun()
 
-# If user is logged in, show main app UI
-if st.session_state.user:
-    st.sidebar.success(f"Logged in as: {st.session_state.user[1]}")
-    st.title("Dashboard")
-    st.write("Your dashboard and app logic goes here.")
-
 # Dashboard/Profile
 if st.session_state.user:
     st.sidebar.success(f"Logged in as: {st.session_state.user[1]}")
