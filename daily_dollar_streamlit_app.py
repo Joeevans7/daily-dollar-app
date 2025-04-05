@@ -268,7 +268,14 @@ if st.session_state.user is None:
 # Dashboard/Profile
 if st.session_state.user:
     st.sidebar.success(f"Logged in as: {st.session_state.user[1]}")
-    profile_section = st.sidebar.radio("Navigation", ["About", "Dashboard", "Profile"])
+    if "profile_section" not in st.session_state:
+        st.session_state.profile_section = "About"  # default on first load
+
+    profile_section = st.sidebar.radio(
+        "Navigation",
+        ["About", "Dashboard", "Profile"],
+        index=["About", "Dashboard", "Profile"].index(st.session_state.profile_section)
+    )
     user_id = st.session_state.user[0]
 
     if profile_section == "About":
