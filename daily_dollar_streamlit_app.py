@@ -254,6 +254,7 @@ if st.session_state.user is None:
             if user:
                 st.session_state.user = user
                 cookie_manager.set("logged_user", user[1])
+                st.session_state.profile_section = "Dashboard"  # Set sidebar to Dashboard
                 st.success(f"Welcome back, {user[1]}!")
                 st.rerun()
             else:
@@ -281,6 +282,7 @@ if st.session_state.user:
         - You can also enter **for free** once per day, which gives you a chance to win 3% of the main prize.
         - The entry window is open from **6:01 PM (CST)** until 4:59 PM (CST)** the following day.
         - Winners are announced at **5:30 PM (CST)** and displayed on the dashboard.
+        - The arrow on the top left gives you access to the menu to navigate the app.
 
         **Streaks & Auto Entry**
     
